@@ -74,6 +74,45 @@ async function run() {
       res.send(result);
     });
 
+    //================================================:delete artifacts by id
+    app.delete("/artifacts/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await artifactCollection.deleteOne(query);
+      if (result.deletedCount === 1) {
+        res.send({ success: true });
+      } else {
+        res.status(404).send({ error: "Artifact not found" });
+      }
+    });
+
+    // :::::::::::::::::::::::::::::::::::::::::::::::::update Artifact
+    app.put("/artifacts/update/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const artifactInfo = req.body;
+
+      const updateInfos = {
+        $set: {
+          artifactName: artifactInfo.artifactName,
+          artifactImage: artifactInfo.artifactImage,
+          artifactType: artifactInfo.artifactType,
+          historicalContext: artifactInfo.historicalContext,
+          createdAt: artifactInfo.createdAt,
+          discoveredAt: artifactInfo.discoveredAt,
+          discoveredBy: artifactInfo.discoveredBy,
+          presentLocation: artifactInfo.presentLocation,
+        },
+      };
+      // console.log("get update info=======>", updateInfos);
+      const result = await artifactCollection.updateOne(filter, updateInfos);
+      if (result.modifiedCount > 0) {
+        res.send({ success: true });
+      } else {
+        res.status(404).send({ error: "Artifact not found" });
+      }
+    });
+
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log(
