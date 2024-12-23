@@ -22,12 +22,30 @@ const client = new MongoClient(uri, {
   },
 });
 
-console.log("env=====>", uri);
-
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
+
+    //access the collection: 'artifacts' within the database: 'AntiquifyDB'
+    const artifactCollection = client.db("AntiquifyDB").collection("artifacts");
+
+    // ==============================================:artifacts(get)
+    // retrive all 'artifacts' from the database
+    app.get("/artifacts", async (req, res) => {
+      const cursor = artifactCollection.find();
+      const result = await cursor.toArray();
+      res.send(result);
+    });
+
+    // ==============================================:artifacts(post)
+    app.post("/artifacts", async (req, res) => {
+      const artifact = req.body;
+      console.log("artifact send from client=======>", artifact);
+    //   const result = await artifactCollection.insertOne(artifact);
+    //   res.send(result);
+    });
+
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log(
@@ -40,6 +58,7 @@ async function run() {
 }
 run().catch(console.dir);
 
+// ------------------------------------------------------------------------
 // When a user visits this URL, the server responds with 'Hello World!'.
 app.get("/", (req, res) => {
   res.send("Hello World! from <=====Antiquify Server=====>");
