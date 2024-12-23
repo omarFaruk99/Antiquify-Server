@@ -1,6 +1,6 @@
 const express = require("express");
 const cors = require("cors");
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 require("dotenv").config();
 
 const app = express();
@@ -45,8 +45,24 @@ async function run() {
         sort: { likes: -1 },
         limit: 6,
       };
-      const cursor = artifactCollection.find({},options); // The {} means "no filter"
+      const cursor = artifactCollection.find({}, options); // The {} means "no filter"
       const result = await cursor.toArray();
+      res.send(result);
+    });
+
+    // =============================================: /artifacts Details by id
+    app.get("/artifacts/details/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) }; // find the document with the specific ObjectId
+      const result = await artifactCollection.findOne(query);
+      res.send(result);
+    });
+
+    // ==============================================:get Artifacts by login user: email
+    app.get("/myArtifacts", async (req, res) => {
+      const email = req.query.email; // Extract the query parameter 'email'
+      const query = { addedByEmail: email }; // Build the query based on the email
+      const result = await artifactCollection.find(query).toArray();
       res.send(result);
     });
 
