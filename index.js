@@ -38,12 +38,24 @@ async function run() {
       res.send(result);
     });
 
+    // ==============================================:artifacts(get) liked_top-6
+    // retrive top==:6 'artifacts' from the database
+    app.get("/artifacts/top", async (req, res) => {
+      const options = {
+        sort: { likes: -1 },
+        limit: 6,
+      };
+      const cursor = artifactCollection.find({},options); // The {} means "no filter"
+      const result = await cursor.toArray();
+      res.send(result);
+    });
+
     // ==============================================:artifacts(post)
     app.post("/artifacts", async (req, res) => {
       const artifact = req.body;
-      console.log("artifact send from client=======>", artifact);
-    //   const result = await artifactCollection.insertOne(artifact);
-    //   res.send(result);
+      console.log("artifact received from server=======>", artifact);
+      const result = await artifactCollection.insertOne(artifact);
+      res.send(result);
     });
 
     // Send a ping to confirm a successful connection
@@ -53,7 +65,7 @@ async function run() {
     );
   } finally {
     // Ensures that the client will close when you finish/error
-    await client.close();
+    // await client.close();
   }
 }
 run().catch(console.dir);
