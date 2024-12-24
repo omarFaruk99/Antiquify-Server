@@ -55,13 +55,42 @@ async function run() {
       res.send(result);
     });
 
-    // =============================================: /artifacts Details by id
+    // #####################################################################start
+    // Define a route to fetch detailed information about an artifact
     app.get("/artifacts/details/:id", async (req, res) => {
+      // Extract the artifact ID from the URL parameters
       const id = req.params.id;
-      const query = { _id: new ObjectId(id) }; // find the document with the specific ObjectId
-      const result = await artifactCollection.findOne(query);
-      res.send(result);
+
+      // Retrieve the user's email from the query parameters
+      const userEmail = req.query.email;
+
+      // Create a query to find the artifact by its unique ID
+      const query = { _id: new ObjectId(id) };
+
+      try {
+        // Find the artifact in the database
+        const artifact = await artifactCollection.findOne(query);
+
+        // If the artifact is not found, return a 404 error
+        if (!artifact) {
+          return res.status(404).send({ error: "Artifact not found" });
+        }
+
+        /*
+      Check if the artifact has a field "likedBy" that stores a list of user emails who liked it.
+      If the current user's email is in that list, set `isLikedByUser` to true, otherwise false.
+    */
+        const isLikedByUser = artifact.likedBy?.includes(userEmail) || false;
+
+        // Respond with the artifact data and the `isLikedByUser` flag
+        res.send({ ...artifact, isLikedByUser });
+      } catch (error) {
+        // Handle any unexpected errors (e.g., database connection issues)
+        console.error("Error fetching artifact details:", error);
+        res.status(500).send({ error: "Internal server error" });
+      }
     });
+    // ###########################################################################End
 
     // ==============================================:get Artifacts by login user: email
     app.get("/myArtifacts", async (req, res) => {
@@ -118,34 +147,52 @@ async function run() {
       }
     });
 
-    // ::::::::::::::::::::::::::::::::::::::::::::::::::::::::Increment Likes
+    // :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::Toggle Likes
     app.put("/artifacts/:id/like", async (req, res) => {
+      // Extract artifact ID from URL parameters
       const { id } = req.params;
 
+      // Extract action (like/dislike) and user's email from request body
+      const { action, email } = req.body;
+
+      // Validate the artifact ID to ensure it's a valid MongoDB ObjectId
       if (!ObjectId.isValid(id)) {
-        console.log("Invalid ObjectId:", id);
         return res.status(400).json({ message: "Invalid artifact ID" });
       }
 
+      // Define the filter for finding the artifact by ID
       const filter = { _id: new ObjectId(id) };
-      const update = { $inc: { likes: 1 } };
 
-      try {
-        console.log("Updating likes for ID:", id);
-        const updateResult = await artifactCollection.updateOne(filter, update);
+      // Define the update operations based on the like/dislike action
+      const update = {
+        $inc: { likes: action === "like" ? 1 : -1 }, // Increment or decrement likes
+        ...(action === "like"
+          ? { $addToSet: { likedBy: email } } // Add email to likedBy array if liking
+          : { $pull: { likedBy: email } }), // Remove email from likedBy array if disliking
+      };
 
-        if (updateResult.matchedCount === 0) {
-          console.log("No document found for ID:", id);
-          return res.status(404).json({ message: "Artifact not found" });
-        }
+      // Perform the update operation
+      const updateResult = await artifactCollection.updateOne(filter, update);
 
-        const updatedDocument = await artifactCollection.findOne(filter);
-        console.log("Updated document:", updatedDocument);
-        res.json(updatedDocument);
-      } catch (error) {
-        console.error("Error updating likes:", error);
-        res.status(500).json({ message: "Error updating likes", error });
+      // Check if the artifact was found and updated
+      if (updateResult.matchedCount === 0) {
+        return res.status(404).json({ message: "Artifact not found" });
       }
+
+      // Retrieve the updated artifact document
+      const updatedDocument = await artifactCollection.findOne(filter);
+
+      // Send the updated artifact document as a response
+      res.json(updatedDocument);
+    });
+    // ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::End
+
+    //
+    app.get("/artifacts/liked", async (req, res) => {
+      const userEmail = req.query.email;
+      const query = { likedBy: userEmail };
+      const result = await artifactCollection.find(query).toArray();
+      res.send(result);
     });
 
     // Send a ping to confirm a successful connection
