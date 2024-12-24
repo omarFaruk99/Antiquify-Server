@@ -1,6 +1,11 @@
 const express = require("express");
 const cors = require("cors");
-const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
+const {
+  MongoClient,
+  ServerApiVersion,
+  ObjectId,
+  ReturnDocument,
+} = require("mongodb");
 require("dotenv").config();
 
 const app = express();
@@ -110,6 +115,36 @@ async function run() {
         res.send({ success: true });
       } else {
         res.status(404).send({ error: "Artifact not found" });
+      }
+    });
+
+    // ::::::::::::::::::::::::::::::::::::::::::::::::::::::::Increment Likes
+    app.put("/artifacts/:id/like", async (req, res) => {
+      const { id } = req.params;
+
+      if (!ObjectId.isValid(id)) {
+        console.log("Invalid ObjectId:", id);
+        return res.status(400).json({ message: "Invalid artifact ID" });
+      }
+
+      const filter = { _id: new ObjectId(id) };
+      const update = { $inc: { likes: 1 } };
+
+      try {
+        console.log("Updating likes for ID:", id);
+        const updateResult = await artifactCollection.updateOne(filter, update);
+
+        if (updateResult.matchedCount === 0) {
+          console.log("No document found for ID:", id);
+          return res.status(404).json({ message: "Artifact not found" });
+        }
+
+        const updatedDocument = await artifactCollection.findOne(filter);
+        console.log("Updated document:", updatedDocument);
+        res.json(updatedDocument);
+      } catch (error) {
+        console.error("Error updating likes:", error);
+        res.status(500).json({ message: "Error updating likes", error });
       }
     });
 
