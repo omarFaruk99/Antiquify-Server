@@ -1,20 +1,56 @@
 const express = require("express");
 const cors = require("cors");
+const jwt = require("jsonwebtoken");
+const cookieParser = require("cookie-parser");
+require("dotenv").config();
+const app = express();
+
+const port = process.env.PORT || 3000;
 const {
   MongoClient,
   ServerApiVersion,
   ObjectId,
   ReturnDocument,
 } = require("mongodb");
-require("dotenv").config();
 
-const app = express();
+// ***********************************************************************jwt
+// Set up CORS to allow requests from the specified origin:
+app.use(
+  cors({
+    origin: ["http://localhost:5173"], // Frontend URL
 
-const port = process.env.PORT || 3000;
+    // Allow sending cookies and authentication data with requests.
+    // This is necessary for features like user authentication.
+    credentials: true,
+  })
+);
 
-// middleware
-app.use(cors());
 app.use(express.json());
+app.use(cookieParser());
+
+// ***********************************************************************verify jwt
+// Middleware to verify JWT tokens from cookies for authentication.
+const verifyToken = (req, res, next) => {
+  const token = req?.cookies?.token; // Get token from cookies
+  // console.log("token============>", token);
+
+  // If no token is found in the cookies, send a 401 Unauthorized response
+  if (!token) {
+    return res.status(401).send({ message: "Unauthorized access" });
+  }
+
+  // Verifying the token using the secret key from environment variables
+  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+    if (err) {
+      // If verification fails (e.g., token is invalid or expired), send a 401 response
+      return res.status(401).send({ message: "Unauthorized access" });
+    }
+
+    // If verification succeeds, attach decoded user data to request object
+    req.user = decoded;
+    next(); // Proceed to next middleware or route
+  });
+};
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.siwod.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
@@ -34,6 +70,37 @@ async function run() {
 
     //access the collection: 'artifacts' within the database: 'AntiquifyDB'
     const artifactCollection = client.db("AntiquifyDB").collection("artifacts");
+
+    // ********************************************************************jwt
+    // JWT Authentication API -> Generate JSON Web Token
+    app.post("/jwt", async (req, res) => {
+      // Extract user data from the request body
+      const user = req.body;
+
+      // Sign a new JWT using the user data and a secret key from the environment variables
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+        expiresIn: "1hr", // Set the token to expire in 1 hour
+      });
+
+      // Send the token as a secure cookie in the response
+      res
+        .cookie("token", token, {
+          httpOnly: true, // Prevent client-side access to the cookie
+          secure: false, // Set to true if using HTTPS
+        })
+        .send({ success: true }); // Send a success response
+    });
+
+    // **********************************************************************jwt logout
+    // Logout Endpoint: Clear Authentication Token
+    app.post("/logout", (req, res) => {
+      res
+        .clearCookie("token", {
+          httpOnly: true,
+          secure: false,
+        })
+        .send({ success: true });
+    });
 
     // ==============================================:artifacts(get)
     // retrive all 'artifacts' from the database
@@ -60,9 +127,18 @@ async function run() {
     app.get("/artifacts/details/:id", async (req, res) => {
       // Extract the artifact ID from the URL parameters
       const id = req.params.id;
+      console.log("--------", id);
 
       // Retrieve the user's email from the query parameters
       const userEmail = req.query.email;
+      // console.log("reqQueryEmail===========>", userEmail);
+      // console.log("verifytoken email========>", req.user.email);
+
+      // **********************************************************
+      // if (req.user.email !== req.query.email) {
+      //   console.log("forbidddddddddddddddddd")
+      //   return res.status(403).send({ message: "forbidden access" });
+      // }
 
       // Create a query to find the artifact by its unique ID
       const query = { _id: new ObjectId(id) };
@@ -90,12 +166,19 @@ async function run() {
         res.status(500).send({ error: "Internal server error" });
       }
     });
-    // ###########################################################################End
 
     // ==============================================:get Artifacts by login user: email
-    app.get("/myArtifacts", async (req, res) => {
+    app.get("/myArtifacts", verifyToken, async (req, res) => {
       const email = req.query.email; // Extract the query parameter 'email'
       const query = { addedByEmail: email }; // Build the query based on the email
+
+      // ************************************
+      if (req.user.email !== req.query.email) {
+        return res.status(403).send({ message: "forbidden access" });
+      }
+
+      console.log("cuk cuk cookies====> ", req.cookies);
+
       const result = await artifactCollection.find(query).toArray();
       res.send(result);
     });
@@ -187,10 +270,16 @@ async function run() {
     });
     // ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::End
 
-    //
-    app.get("/artifacts/liked", async (req, res) => {
+    //==================================================get login user liked artifacts
+    app.get("/artifacts/liked", verifyToken, async (req, res) => {
       const userEmail = req.query.email;
       const query = { likedBy: userEmail };
+
+      // *******************************************
+      if (req.user.email !== req.query.email) {
+        return res.status(403).send({ message: "forbidden access" });
+      }
+
       const result = await artifactCollection.find(query).toArray();
       res.send(result);
     });
