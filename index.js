@@ -1,26 +1,23 @@
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
 const cookieParser = require("cookie-parser");
-require("dotenv").config();
 const app = express();
 
 const port = process.env.PORT || 3000;
-const {
-  MongoClient,
-  ServerApiVersion,
-  ObjectId,
-  ReturnDocument,
-} = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 
 // ***********************************************************************jwt
 // Set up CORS to allow requests from the specified origin:
 app.use(
   cors({
-    origin: ["http://localhost:5173"], // Frontend URL
+    origin: [
+      "http://localhost:5173",
+      "https://antiquify-68162.web.app",
+      "https://antiquify-68162.firebaseapp.com",
+    ],
 
-    // Allow sending cookies and authentication data with requests.
-    // This is necessary for features like user authentication.
     credentials: true,
   })
 );
@@ -66,7 +63,7 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    // await client.connect();
 
     //access the collection: 'artifacts' within the database: 'AntiquifyDB'
     const artifactCollection = client.db("AntiquifyDB").collection("artifacts");
@@ -79,14 +76,15 @@ async function run() {
 
       // Sign a new JWT using the user data and a secret key from the environment variables
       const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
-        expiresIn: "1hr", // Set the token to expire in 1 hour
+        expiresIn: "5hr", // Set the token to expire in 1 hour
       });
 
       // Send the token as a secure cookie in the response
       res
         .cookie("token", token, {
           httpOnly: true, // Prevent client-side access to the cookie
-          secure: false, // Set to true if using HTTPS
+          secure: process.env.NODE_ENV === "production",
+          sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
         })
         .send({ success: true }); // Send a success response
     });
@@ -97,7 +95,8 @@ async function run() {
       res
         .clearCookie("token", {
           httpOnly: true,
-          secure: false,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
         })
         .send({ success: true });
     });
@@ -285,10 +284,10 @@ async function run() {
     });
 
     // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
-    console.log(
-      "Pinged your deployment. You successfully connected to MongoDB!"
-    );
+    // await client.db("admin").command({ ping: 1 });
+    // console.log(
+    //   "Pinged your deployment. You successfully connected to MongoDB!"
+    // );
   } finally {
     // Ensures that the client will close when you finish/error
     // await client.close();
