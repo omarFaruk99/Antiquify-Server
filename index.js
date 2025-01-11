@@ -121,7 +121,7 @@ async function run() {
       res.send(result);
     });
 
-    // #####################################################################start
+    // #######################################################start
     // Define a route to fetch detailed information about an artifact
     app.get("/artifacts/details/:id", async (req, res) => {
       // Extract the artifact ID from the URL parameters
